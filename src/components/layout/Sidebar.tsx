@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { getInitials } from '@/lib/utils';
+// import { DoctorProfileCard } from '@/features/profile/DoctorProfileCard';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -78,6 +79,13 @@ export function Sidebar() {
           </>
         )}
       </nav>
+
+      {/* Doctor Profile Card */}
+      {/* {!collapsed && (
+        <div className="px-3 py-4 border-t border-slate-700/50">
+          <DoctorProfileCard />
+        </div>
+      )} */}
 
       {/* User + collapse */}
       <div className="p-3 border-t border-slate-700/50 flex flex-col gap-2">

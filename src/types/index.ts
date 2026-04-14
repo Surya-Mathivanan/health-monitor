@@ -15,6 +15,11 @@ export interface UserProfile {
   display_name: string;
   avatar_url?: string;
   role: UserRole;
+  // Doctor/Advisor profile details
+  position?: string;
+  personal_number?: string;
+  degree?: string;
+  experience?: string;
   created_at: string;
 }
 
