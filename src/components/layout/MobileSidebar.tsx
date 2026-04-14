@@ -1,7 +1,8 @@
-import { NavLink } from 'react-router-dom';
-import { X, LayoutDashboard, Users, Bell, LogOut, Heart } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { X, LayoutDashboard, Users, Bell, LogOut, Heart, User, Sun, Moon } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { useDarkMode } from '@/hooks/useDarkMode';
 
 interface MobileSidebarProps {
   isOpen: boolean;
@@ -10,12 +11,20 @@ interface MobileSidebarProps {
 
 export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
   const { profile, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { dark, toggle } = useDarkMode();
 
   const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/clients',   label: 'Clients',   icon: Users },
     { to: '/reminders', label: 'Reminders', icon: Bell },
+    { to: '/profile',   label: 'My Profile', icon: User },
   ];
+
+  const handleProfileClick = () => {
+    navigate('/profile');
+    onClose();
+  };
 
   return (
     <>
@@ -52,19 +61,6 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
           </button>
         </div>
 
-        {/* User Info */}
-        {profile && (
-          <div className="p-4 border-b border-slate-700/50 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full brand-gradient-bg flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow-md">
-              {getInitials(profile.display_name || 'User')}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">{profile.display_name}</p>
-              <p className="text-[11px] text-slate-400 capitalize">{profile.role}</p>
-            </div>
-          </div>
-        )}
-
         {/* Navigation */}
         <nav className="flex-1 p-3 flex flex-col gap-1 overflow-y-auto mt-2">
           {navItems.map(({ to, label, icon: Icon }) => (
@@ -84,6 +80,17 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
 
         {/* Footer Actions */}
         <div className="p-4 border-t border-slate-700/50 space-y-2 pb-safe">
+          {/* Dark Mode Toggle */}
+          <button
+            onClick={toggle}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/70 transition-colors"
+            title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {dark ? <Sun className="w-5 h-5 flex-shrink-0" /> : <Moon className="w-5 h-5 flex-shrink-0" />}
+            <span>{dark ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+
+          {/* Logout */}
           <button
             onClick={() => {
               signOut();

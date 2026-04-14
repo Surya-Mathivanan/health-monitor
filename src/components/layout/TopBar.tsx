@@ -27,6 +27,16 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
         {/* Notifications (Available on both Desktop and Mobile) */}
         <NotificationBell />
 
+        {/* Dark mode toggle - Mobile */}
+        <button
+          onClick={toggle}
+          id="dark-mode-toggle-mobile"
+          className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/70 transition-all"
+          title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+
         {/* Desktop only: Dark mode + Avatar */}
         <div className="hidden lg:flex items-center gap-2">
           <button

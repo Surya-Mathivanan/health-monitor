@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Phone, User, Activity, FileText, MessageSquare,
-  Calendar, Ruler, Weight, ChevronRight, Menu
+  Calendar, Ruler, Weight, ChevronRight, Menu, MoreVertical
 } from 'lucide-react';
 import { useClient } from '@/hooks/useClients';
 import { Button } from '@/components/ui/Button';
@@ -123,7 +123,7 @@ export function ClientProfilePage() {
       </div>
 
       {/* Tabs: Desktop view with horizontal tabs + Mobile menu button */}
-      <div className="flex items-center justify-between lg:justify-start gap-2">
+      <div className="flex items-center justify-between lg:justify-start gap-3">
         {/* Desktop tabs (hidden on mobile) */}
         <div className="hidden lg:flex tab-row">
           {tabs.map(({ id: tabId, label, icon: Icon }) => (
@@ -141,14 +141,37 @@ export function ClientProfilePage() {
           ))}
         </div>
 
-        {/* Mobile tab selector button */}
-        <button
-          onClick={() => setShowTabSidebar(true)}
-          className="lg:hidden flex items-center gap-2 px-3 py-2 text-sm font-medium text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/10 transition-colors"
-        >
-          <Menu className="w-4 h-4" />
-          {tabs.find(t => t.id === activeTab)?.label}
-        </button>
+        {/* Mobile tab display + More button */}
+        <div className="lg:hidden flex items-center gap-2">
+          {/* Current tab label */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/15 border border-emerald-500/30 rounded-lg">
+            <Activity className="w-4 h-4 text-emerald-400" />
+            <span className="text-sm font-medium text-emerald-400">{tabs.find(t => t.id === activeTab)?.label}</span>
+          </div>
+
+          {/* More button */}
+          <button
+            onClick={() => setShowTabSidebar(true)}
+            className="flex items-center justify-center p-2 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 border border-slate-700/50 rounded-lg transition-colors"
+            title="More options"
+          >
+            <MoreVertical className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => setShowTabSidebar(true)}
+            className="flex items-center justify-center p-2 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 border border-slate-700/50 rounded-lg transition-colors"
+            title="More options"
+          >
+            <MoreVertical className="w-5 h-5" />
+          </button>
+           <button
+            onClick={() => setShowTabSidebar(true)}
+            className="flex items-center justify-center p-2 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 border border-slate-700/50 rounded-lg transition-colors"
+            title="More options"
+          >
+            <MoreVertical className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Tab content */}

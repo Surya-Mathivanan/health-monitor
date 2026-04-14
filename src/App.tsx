@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { ClientsPage } from '@/features/clients/ClientsPage';
 import { ClientProfilePage } from '@/features/profile/ClientProfilePage';
+import { UserProfilePage } from '@/features/profile/UserProfilePage';
 import { RemindersPage } from '@/features/reminders/RemindersPage';
 
 export default function App() {
@@ -26,6 +27,7 @@ export default function App() {
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="clients" element={<ClientsPage />} />
                 <Route path="clients/:id" element={<ClientProfilePage />} />
+                <Route path="profile" element={<UserProfilePage />} />
                 <Route path="reminders" element={<RemindersPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>

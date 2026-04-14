@@ -85,13 +85,13 @@ export function LoginPage() {
       <div className="relative w-full max-w-md animate-slide-up">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3 mb-8">
-          <div className="w-16 h-16 rounded-2xl brand-gradient-bg flex items-center justify-center shadow-brand-lg">
+          {/* <div className="w-16 h-16 rounded-2xl brand-gradient-bg flex items-center justify-center shadow-brand-lg">
             <Heart className="w-8 h-8 text-white" />
           </div>
           <div className="text-center">
             <h1 className="text-2xl font-bold text-white">LifeCare Wellness</h1>
             <p className="text-slate-400 text-sm mt-1">Comprehensive Health Management</p>
-          </div>
+          </div> */}
         </div>
 
         {/* Card */}
@@ -113,7 +113,7 @@ export function LoginPage() {
           </div>
 
           {/* Google OAuth */}
-          <Button
+          {/* <Button
             id="google-login-btn"
             variant="outline"
             className="w-full mb-4"
@@ -121,7 +121,7 @@ export function LoginPage() {
             leftIcon={<Globe className="w-4 h-4" />}
           >
             Continue with Google
-          </Button>
+          </Button> */}
 
           <div className="flex items-center gap-3 mb-4">
             <div className="flex-1 h-px bg-slate-700/60" />
