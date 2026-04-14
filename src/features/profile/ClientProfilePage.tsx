@@ -14,6 +14,7 @@ import { HealthHistoryTab } from '@/features/health/HealthHistoryTab';
 import { CallLogsTab } from '@/features/calls/CallLogsTab';
 import { StaffNotesTab } from '@/features/notes/StaffNotesTab';
 import { CallButton } from '@/features/calls/CallButton';
+import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 
 type Tab = 'report' | 'history' | 'calls' | 'notes';
 
@@ -33,20 +34,23 @@ export function ClientProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="p-4 lg:p-6 animate-fade-in">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-24 bg-slate-700/50 rounded" />
-          <div className="glass-card p-6 space-y-4">
-            <div className="flex gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-slate-700/50" />
-              <div className="space-y-2 flex-1">
-                <div className="h-6 w-48 bg-slate-700/50 rounded" />
-                <div className="h-4 w-32 bg-slate-700/30 rounded" />
+      <>
+        <LoadingOverlay isLoading={isLoading} message="Loading client profile..." />
+        <div className="p-4 lg:p-6 animate-fade-in">
+          <div className="animate-pulse space-y-4">
+            <div className="h-8 w-24 bg-slate-700/50 rounded" />
+            <div className="glass-card p-6 space-y-4">
+              <div className="flex gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-slate-700/50" />
+                <div className="space-y-2 flex-1">
+                  <div className="h-6 w-48 bg-slate-700/50 rounded" />
+                  <div className="h-4 w-32 bg-slate-700/30 rounded" />
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 

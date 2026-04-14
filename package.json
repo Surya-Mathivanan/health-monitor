@@ -10,6 +10,7 @@
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@types/styled-components": "^5.1.36",
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.5.0",
     "postcss": "^8.5.9",
@@ -33,6 +34,7 @@
     "react-is": "^19.2.5",
     "react-router-dom": "^7.14.1",
     "recharts": "^3.8.1",
+    "styled-components": "^6.4.0",
     "tailwind-merge": "^3.5.0",
     "zod": "^3.25.76"
   }

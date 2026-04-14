@@ -10,6 +10,7 @@ import { getReminderStatusColor, dueDateLabel } from '@/lib/utils';
 import { isPast } from 'date-fns';
 import type { ReminderStatus } from '@/types';
 import { Pagination } from '@/components/ui/Pagination';
+import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 
 import { AddReminderModal } from './AddReminderModal';
 
@@ -46,7 +47,9 @@ export function RemindersPage() {
   ];
 
   return (
-    <div className="p-4 lg:p-6 space-y-5 animate-fade-in">
+    <>
+      <LoadingOverlay isLoading={isLoading} message="Loading reminders..." />
+      <div className="p-4 lg:p-6 space-y-5 animate-fade-in">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Reminders</h1>
@@ -150,5 +153,6 @@ export function RemindersPage() {
         </>
       )}
     </div>
+    </>
   );
 }

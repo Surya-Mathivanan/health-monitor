@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { formatRelative, dueDateLabel } from '@/lib/utils';
 import { Pagination } from '@/components/ui/Pagination';
+import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 
 function KPICard({ icon: Icon, label, value, color, subtitle }: {
   icon: React.ElementType; label: string; value: number; color: string; subtitle?: string;
@@ -54,7 +55,9 @@ export function DashboardPage() {
   const paginatedActivity = activity.slice((activityPage - 1) * itemsPerPage, activityPage * itemsPerPage);
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 animate-fade-in">
+    <>
+      <LoadingOverlay isLoading={kpiLoading} message="Loading dashboard..." />
+      <div className="p-4 lg:p-6 space-y-6 animate-fade-in">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Dashboard</h1>
@@ -181,5 +184,6 @@ export function DashboardPage() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

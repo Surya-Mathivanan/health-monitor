@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { AddClientModal } from './AddClientModal';
 import { getEngagementColor, getInitials, formatRelative } from '@/lib/utils';
+import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 
 function useDebounce<T>(value: T, delay = 300): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -28,7 +29,9 @@ export function ClientsPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="p-4 lg:p-6 space-y-5 animate-fade-in">
+    <>
+      <LoadingOverlay isLoading={isLoading} message="Loading clients..." />
+      <div className="p-4 lg:p-6 space-y-5 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -172,5 +175,6 @@ export function ClientsPage() {
 
       <AddClientModal open={showAddModal} onClose={() => setShowAddModal(false)} />
     </div>
+    </>
   );
 }
