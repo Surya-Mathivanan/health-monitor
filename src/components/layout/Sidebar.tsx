@@ -89,7 +89,7 @@ export function Sidebar() {
 
       {/* User + collapse */}
       <div className="p-3 border-t border-slate-700/50 flex flex-col gap-2">
-        {!collapsed && profile && (
+        {/* {!collapsed && profile && (
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 rounded-full brand-gradient-bg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
               {getInitials(profile.display_name || 'User')}
@@ -99,7 +99,7 @@ export function Sidebar() {
               <p className="text-[10px] text-slate-500 capitalize">{profile.role}</p>
             </div>
           </div>
-        )}
+        )} */}
         <button
           onClick={signOut}
           className={cn('nav-link text-red-400 hover:text-red-300 hover:bg-red-400/10', collapsed && 'justify-center px-2')}
