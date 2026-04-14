@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Users, Phone, Clock, FileText, TrendingUp, Activity, CheckCircle2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useDashboardKPIs, useWeeklyCallData, useDueTodayReminders, useRecentActivity } from '@/hooks/useDashboard';
@@ -6,6 +7,7 @@ import { Card, CardContent, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { formatRelative, dueDateLabel } from '@/lib/utils';
+import { Pagination } from '@/components/ui/Pagination';
 
 function KPICard({ icon: Icon, label, value, color, subtitle }: {
   icon: React.ElementType; label: string; value: number; color: string; subtitle?: string;
@@ -45,6 +47,11 @@ export function DashboardPage() {
   const { data: dueToday = [] } = useDueTodayReminders();
   const { data: activity = [] } = useRecentActivity();
   const completeReminder = useCompleteReminder();
+
+  const [activityPage, setActivityPage] = useState(1);
+  const itemsPerPage = 5;
+  const totalPages = Math.ceil(activity.length / itemsPerPage);
+  const paginatedActivity = activity.slice((activityPage - 1) * itemsPerPage, activityPage * itemsPerPage);
 
   return (
     <div className="p-4 lg:p-6 space-y-6 animate-fade-in">
@@ -153,20 +160,23 @@ export function DashboardPage() {
           {activity.length === 0 ? (
             <p className="text-slate-500 text-sm text-center py-6">No recent activity</p>
           ) : (
-            <div className="space-y-3">
-              {activity.map(a => (
-                <div key={a.id} className="flex items-center gap-3 py-2 border-b border-slate-800/50 last:border-0">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-300">
-                      <span className="font-medium text-white">{(a as any).actor?.display_name ?? 'System'}</span>
-                      {' '}{a.action} in <span className="text-emerald-400">{a.table_name}</span>
-                    </p>
+            <>
+              <div className="space-y-3">
+                {paginatedActivity.map(a => (
+                  <div key={a.id} className="flex items-center gap-3 py-2 border-b border-slate-800/50 last:border-0">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-slate-300">
+                        <span className="font-medium text-white">{(a as any).actor?.display_name ?? 'System'}</span>
+                        {' '}{a.action} in <span className="text-emerald-400">{a.table_name}</span>
+                      </p>
+                    </div>
+                    <p className="text-xs text-slate-600 flex-shrink-0">{formatRelative(a.created_at)}</p>
                   </div>
-                  <p className="text-xs text-slate-600 flex-shrink-0">{formatRelative(a.created_at)}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+              <Pagination currentPage={activityPage} totalPages={totalPages} onPageChange={setActivityPage} />
+            </>
           )}
         </CardContent>
       </Card>

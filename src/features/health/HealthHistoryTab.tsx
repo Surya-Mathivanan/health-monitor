@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useHealthReports } from '@/hooks/useHealthReports';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Activity } from 'lucide-react';
@@ -6,6 +7,7 @@ import {
   CartesianGrid, Legend
 } from 'recharts';
 import { formatDate } from '@/lib/utils';
+import { Pagination } from '@/components/ui/Pagination';
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload?.length) {
@@ -23,6 +25,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function HealthHistoryTab({ clientId }: { clientId: string }) {
   const { data: reports = [], isLoading } = useHealthReports(clientId);
+
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 5;
+  const totalPages = Math.ceil(reports.length / itemsPerPage);
+  const paginatedReports = reports.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
   const chartData = [...reports].reverse().map(r => ({
     date: formatDate(r.recorded_at, 'MMM d'),
@@ -58,7 +65,7 @@ export function HealthHistoryTab({ clientId }: { clientId: string }) {
               </tr>
             </thead>
             <tbody>
-              {reports.map(r => (
+              {paginatedReports.map(r => (
                 <tr key={r.id} className="border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition-colors">
                   <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{formatDate(r.recorded_at, 'MMM d, yy')}</td>
                   <td className="px-4 py-3 text-white">{r.body_fat_pct}%</td>
@@ -72,6 +79,7 @@ export function HealthHistoryTab({ clientId }: { clientId: string }) {
             </tbody>
           </table>
         </div>
+        <div className="pb-4"><Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} /></div>
       </div>
 
       {/* Line Chart */}

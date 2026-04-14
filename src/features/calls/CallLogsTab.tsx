@@ -5,10 +5,15 @@ import { CallEndedModal } from './CallEndedModal';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent } from '@/components/ui/Card';
 import { getOutcomeColor, getOutcomeLabel, formatDateTime, formatRelative } from '@/lib/utils';
+import { Pagination } from '@/components/ui/Pagination';
 
 export function CallLogsTab({ clientId }: { clientId: string }) {
   const { data: logs = [], isLoading } = useCallLogs(clientId);
   const [showModal, setShowModal] = useState(false);
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 5;
+  const totalPages = Math.ceil(logs.length / itemsPerPage);
+  const paginatedLogs = logs.slice((page - 1) * itemsPerPage, page * itemsPerPage);
 
   const outcomeIcon: Record<string, React.ReactNode> = {
     connected: <CheckCircle className="w-3.5 h-3.5" />,
@@ -41,34 +46,37 @@ export function CallLogsTab({ clientId }: { clientId: string }) {
           <p className="text-slate-400">No calls logged yet</p>
         </CardContent></Card>
       ) : (
-        <div className="space-y-3">
-          {logs.map(log => (
-            <div key={log.id} className="glass-card p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className={`status-badge ${getOutcomeColor(log.outcome)}`}>
-                    {outcomeIcon[log.outcome]}
-                    {getOutcomeLabel(log.outcome)}
-                  </span>
-                  {log.duration_seconds && (
-                    <span className="flex items-center gap-1 text-xs text-slate-500">
-                      <Clock className="w-3 h-3" />
-                      {Math.floor(log.duration_seconds / 60)}m {log.duration_seconds % 60}s
+        <>
+          <div className="space-y-3">
+            {paginatedLogs.map(log => (
+              <div key={log.id} className="glass-card p-4 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`status-badge ${getOutcomeColor(log.outcome)}`}>
+                      {outcomeIcon[log.outcome]}
+                      {getOutcomeLabel(log.outcome)}
                     </span>
-                  )}
+                    {log.duration_seconds && (
+                      <span className="flex items-center gap-1 text-xs text-slate-500">
+                        <Clock className="w-3 h-3" />
+                        {Math.floor(log.duration_seconds / 60)}m {log.duration_seconds % 60}s
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-slate-500 flex-shrink-0">{formatRelative(log.called_at)}</span>
                 </div>
-                <span className="text-xs text-slate-500 flex-shrink-0">{formatRelative(log.called_at)}</span>
+                {log.discussion_notes && (
+                  <p className="text-sm text-slate-300 bg-slate-800/40 rounded-lg p-3">{log.discussion_notes}</p>
+                )}
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <span>{formatDateTime(log.called_at)}</span>
+                  {log.follow_up_required && <Badge variant="warning">Follow-up set</Badge>}
+                </div>
               </div>
-              {log.discussion_notes && (
-                <p className="text-sm text-slate-300 bg-slate-800/40 rounded-lg p-3">{log.discussion_notes}</p>
-              )}
-              <div className="flex items-center gap-3 text-xs text-slate-500">
-                <span>{formatDateTime(log.called_at)}</span>
-                {log.follow_up_required && <Badge variant="warning">Follow-up set</Badge>}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        </>
       )}
 
       <CallEndedModal open={showModal} onClose={() => setShowModal(false)} clientId={clientId} />
