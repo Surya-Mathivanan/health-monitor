@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: #10B981;
+    --color-secondary: #0EA5E9;
+    --color-accent: #3B82F6;
+    --color-gold: #D4AF37;
+    --color-silver: #C0C0C0;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-100 font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-slate-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-700 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-600;
+  }
+
+  ::selection {
+    @apply bg-emerald-500/30 text-emerald-100;
+  }
+}
+
+@layer components {
+  /* Glass card effect */
+  .glass-card {
+    @apply bg-slate-900/60 backdrop-blur-sm border border-slate-700/50 rounded-2xl;
+  }
+
+  .glass-card-hover {
+    @apply glass-card transition-all duration-300 hover:bg-slate-800/70 hover:border-slate-600/60 hover:shadow-card-hover;
+  }
+
+  /* Brand gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-emerald-400 via-sky-400 to-blue-400 bg-clip-text text-transparent;
+  }
+
+  .gold-gradient-text {
+    @apply bg-gold-gradient bg-clip-text text-transparent;
+  }
+
+  /* Brand gradient bg */
+  .brand-gradient-bg {
+    background: linear-gradient(135deg, #10B981 0%, #0EA5E9 50%, #3B82F6 100%);
+  }
+
+  /* Sidebar link hover */
+  .nav-link {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/70 transition-all duration-200 text-sm font-medium;
+  }
+
+  .nav-link-active {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-white bg-emerald-500/15 border border-emerald-500/25 text-sm font-medium;
+  }
+
+  /* Form inputs */
+  .form-input {
+    @apply w-full px-4 py-2.5 bg-slate-800/70 border border-slate-700/60 rounded-xl text-slate-100 placeholder-slate-500
+           focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/60
+           transition-all duration-200 text-sm;
+  }
+
+  .form-label {
+    @apply block text-sm font-medium text-slate-300 mb-1.5;
+  }
+
+  .form-error {
+    @apply text-red-400 text-xs mt-1;
+  }
+
+  /* Status badge */
+  .status-badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border;
+  }
+
+  /* KPI card */
+  .kpi-card {
+    @apply glass-card p-5 flex flex-col gap-3;
+  }
+
+  /* Scrollable horizontal tabs */
+  .tab-row {
+    @apply flex gap-2 overflow-x-auto pb-1 scrollbar-hide;
+  }
+
+  .tab-btn {
+    @apply px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200
+           text-slate-400 hover:text-white hover:bg-slate-800/70 border border-transparent;
+  }
+
+  .tab-btn-active {
+    @apply px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap
+           text-emerald-400 bg-emerald-500/10 border border-emerald-500/30;
+  }
+
+  /* Scrollbar hide utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* PWA / Mobile safe area */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

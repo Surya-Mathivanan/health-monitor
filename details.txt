@@ -1,0 +1,358 @@
+═══════════════════════════════════════════════════════════════════════════════
+                        LIFECARE WELLNESS — PROJECT DETAILS
+                    Complete Technical Reference & Working Guide
+═══════════════════════════════════════════════════════════════════════════════
+
+PROJECT OVERVIEW
+────────────────
+LifeCare Wellness is a full-stack, browser-based health and call management 
+application designed for wellness professionals and clinic staff. It allows 
+staff to manage client profiles, track body composition metrics, log calls, 
+set follow-up reminders, and write notes — all from a single responsive 
+interface that works on phone, tablet, and desktop.
+
+═══════════════════════════════════════════════════════════════════════════════
+HOW THE APP WORKS — END TO END FLOW
+═══════════════════════════════════════════════════════════════════════════════
+
+1. STARTING THE APP
+   ─────────────────
+   Run: npm run dev
+   Opens at: http://localhost:5173
+
+   The app boots via src/main.tsx which wraps everything in:
+   - BrowserRouter (React Router v7) for navigation
+   - QueryClientProvider (TanStack Query) for data fetching/caching
+   - AuthProvider (custom context) which reads the Supabase session
+
+2. AUTHENTICATION FLOW
+   ────────────────────
+   File: src/features/auth/LoginPage.tsx
+
+   Option A — Google OAuth:
+   • User clicks "Continue with Google"
+   • Calls supabase.auth.signInWithOAuth({ provider: 'google' })
+   • Supabase redirects to Google, then back to /auth/callback
+   • AuthCallback.tsx reads the session and upserts a row in public.users
+   • User lands on /dashboard
+
+   Option B — Email/Password Login:
+   • User enters credentials, form validated with Zod schema
+   • Calls supabase.auth.signInWithPassword()
+   • On success, navigate to /dashboard
+
+   Option C — Register:
+   • Calls supabase.auth.signUp() → Supabase sends confirmation email
+   • Also inserts a row into public.users with display_name and role='staff'
+
+   JWT Handling:
+   • Supabase Auth manages JWT tokens entirely
+   • Tokens are stored in browser localStorage by Supabase
+   • The AuthProvider subscribes to onAuthStateChange to always keep 
+     session state current; non-authenticated users are redirected to /login
+     by AuthGuard.tsx
+
+3. DASHBOARD (src/features/dashboard/DashboardPage.tsx)
+   ──────────────────────────────────────────────────────
+   Four KPI cards are loaded in parallel:
+   • Total Active Clients     ← SELECT count FROM clients WHERE status='active'
+   • Calls This Week          ← SELECT count FROM call_logs WHERE called_at >= week_start
+   • Follow-Ups Due Today     ← SELECT count FROM reminders WHERE status='pending' AND due_at = today
+   • Reports This Month       ← SELECT count FROM health_reports WHERE recorded_at >= month_start
+
+   Weekly Call Volume bar chart (Recharts):
+   • Fetches call_logs for the current week, groups by day of week
+
+   Due Today list:
+   • Fetches pending reminders due today, shows quick "Done" button
+   • Clicking Done calls completeReminder mutation (PATCH status='completed')
+
+   Recent Activity feed:
+   • Reads last 10 rows from audit_logs table (auto-populated by Postgres triggers)
+
+4. CLIENT MANAGEMENT (src/features/clients/)
+   ──────────────────────────────────────────
+   ClientsPage.tsx:
+   • Renders a grid of client cards
+   • Search bar uses debounced input → Supabase .ilike('full_name', '%query%')
+   • Filter panel: gender, wellness program, active/inactive
+   • "Add Client" button opens AddClientModal
+
+   AddClientModal.tsx:
+   • Form fields: Full Name, Mobile, Age, Gender, Height, Weight, Wellness Program
+   • Validated with react-hook-form + Zod schema
+   • On submit: INSERT into clients table
+   • On success: navigate to /clients/:id (new client profile)
+
+5. CLIENT PROFILE (src/features/profile/ClientProfilePage.tsx)
+   ─────────────────────────────────────────────────────────────
+   Header card shows:
+   • Avatar (initials-based), name, program badge, status badge
+   • Quick stats: mobile, age, height, weight
+   • "Call Now" button (see Call Management below)
+
+   Four tabs (scrollable on mobile):
+   ┌─────────────────────────────────────────────────────────┐
+   │ TAB 1: Latest Report  (LatestReportTab.tsx)             │
+   │  Shows the most recent health report with 6 metric cards│
+   │  Each card shows value + status flag badge              │
+   │  "Log Report" button opens a modal form                 │
+   ├─────────────────────────────────────────────────────────┤
+   │ TAB 2: Health History  (HealthHistoryTab.tsx)           │
+   │  Table of all health reports (oldest → newest)          │
+   │  Line chart showing BMI, Body Fat, Visceral Fat trends  │
+   ├─────────────────────────────────────────────────────────┤
+   │ TAB 3: Call Logs  (CallLogsTab.tsx)                     │
+   │  List of all call entries for this client               │
+   │  Each card: outcome chip, duration, notes, follow-up    │
+   │  "Log call manually" button also opens CallEndedModal   │
+   ├─────────────────────────────────────────────────────────┤
+   │ TAB 4: Staff Notes  (StaffNotesTab.tsx)                 │
+   │  Free-text notes per client, sorted by pinned first     │
+   │  Pin/unpin toggle, delete button                        │
+   └─────────────────────────────────────────────────────────┘
+
+6. HEALTH REPORT LOGGING
+   ──────────────────────
+   File: src/features/health/LatestReportTab.tsx
+
+   Staff fills in:
+   • Body Fat % · Visceral Fat level · BMI · Resting BMR · Body Age · Skeletal Muscle Mass
+
+   On INSERT into health_reports:
+   • A Postgres BEFORE INSERT trigger (compute_health_flags) automatically sets:
+     - bmi_status = 'underweight' | 'normal' | 'overweight' | 'obese'
+     - visceral_flag = 'normal' | 'high' | 'very_high'
+   • No client-side computation needed — the DB handles it
+
+7. CALL MANAGEMENT
+   ─────────────────
+   File: src/features/calls/
+
+   CallButton.tsx:
+   • On mobile: opens tel: link (native phone dialer), then shows modal after 1.5s
+   • On desktop: opens CallEndedModal immediately
+
+   CallEndedModal.tsx:
+   • Staff selects outcome: Connected / Missed / Voicemail
+   • Enters call duration (seconds) and discussion notes
+   • Toggle to "Set Follow-up Reminder" — expands date/time picker, title, notes
+
+   On submit (useLogCall hook / useCalls.ts):
+   • INSERT into call_logs table
+   • If follow-up toggled: INSERT into reminders table, linked_call_id FK set
+
+8. REMINDERS & REALTIME
+   ─────────────────────
+   File: src/features/reminders/RemindersPage.tsx
+
+   • Shows Pending / Completed / All tabs
+   • Overdue reminders highlighted red
+   • "Mark Complete" button PATCHes status='completed'
+
+   Realtime sync (useRealtimeReminders hook):
+   • Subscribes to Supabase Realtime channel on public.reminders table
+   • Any INSERT/UPDATE/DELETE from any session triggers a re-fetch
+   • This means if Staff A completes a reminder, Staff B sees it disappear 
+     from their Pending list instantly without refreshing
+
+9. NOTIFICATIONS
+   ──────────────
+   File: src/features/notifications/NotificationBell.tsx
+
+   • Bell icon in TopBar with unread dot indicator
+   • Clicking opens a dropdown listing notifications
+   • "Mark all read" button PATCHes all unread rows for current user
+   • Notifications are inserted by the backend (e.g., staff Edge Functions 
+     can write to public.notifications for scheduled follow-up alerts)
+
+10. DARK MODE
+    ──────────
+    File: src/hooks/useDarkMode.ts
+
+    • Reads localStorage key 'lifecare-theme' on load
+    • Falls back to system preference (prefers-color-scheme) if no preference saved
+    • Toggling adds/removes 'dark' class on <html> element
+    • Tailwind's dark: variant applies dark-mode styles throughout the app
+
+═══════════════════════════════════════════════════════════════════════════════
+DATABASE TABLES AND THEIR PURPOSE
+═══════════════════════════════════════════════════════════════════════════════
+
+users              → Mirrors Supabase Auth. Stores display_name, avatar_url, role
+                     role = 'staff' (default) or 'admin'
+
+wellness_programs  → Seeded with 6 programs (Weight Loss, Muscle Gain, etc.)
+                     Staff can assign a program to each client
+
+clients            → Core client record: demographics, height, weight, program
+                     status = 'active' | 'inactive'
+
+health_reports     → One row per body scan / measurement session
+                     Postgres trigger auto-fills: bmi_status, visceral_flag
+
+call_logs          → One row per call made. Links to reminders via linked_call_id
+
+reminders          → Scheduled follow-up tasks. Realtime publication enabled.
+                     status = 'pending' | 'completed' | 'snoozed'
+
+staff_notes        → Free-text notes per client, authored by a staff member
+                     is_pinned = true floats notes to the top
+
+notifications      → In-app alerts per user. Realtime publication enabled.
+                     type = 'follow_up' | 'system'
+
+audit_logs         → Automatic write log. Every INSERT/UPDATE/DELETE on key 
+                     tables is recorded here via Postgres trigger
+
+═══════════════════════════════════════════════════════════════════════════════
+SECURITY MODEL
+═══════════════════════════════════════════════════════════════════════════════
+
+• Every table has Row Level Security (RLS) enabled
+• Staff users can only see/write their own data (assigned_to = auth.uid())
+• Clients table is readable by ALL authenticated staff
+• Admin role bypasses restrictions via is_admin() Postgres function
+• .env file is gitignored — credentials NEVER go to Git
+
+═══════════════════════════════════════════════════════════════════════════════
+DATA FLOW DIAGRAM
+═══════════════════════════════════════════════════════════════════════════════
+
+  Browser (React)
+       │
+       ├── Supabase JS Client ──► Supabase Project (PostgreSQL)
+       │       │                        │
+       │       │                        ├── RLS Policies (auth.uid() checks)
+       │       │                        ├── Postgres Triggers (health flags, audit)
+       │       │                        └── Realtime (reminders, notifications)
+       │       │
+       │       └── Supabase Auth ──► JWT tokens (localStorage)
+       │                               └── Google OAuth flow
+       │
+       ├── React Query (TanStack) — caching, background refetch
+       ├── React Hook Form + Zod — client-side validation
+       └── React Router v7 — client-side navigation
+
+═══════════════════════════════════════════════════════════════════════════════
+FILE STRUCTURE
+═══════════════════════════════════════════════════════════════════════════════
+
+Health Monitor Web/
+├── .env                          ← Your Supabase keys (gitignored)
+├── .env.example                  ← Template for .env
+├── .gitignore
+├── README.md
+├── details.txt                   ← This file
+├── index.html                    ← Root HTML, entry point
+├── tailwind.config.ts            ← Custom theme: emerald, sky, blue, gold, silver
+├── postcss.config.js
+├── vite.config.ts                ← Vite config with @/ path alias
+├── tsconfig.json                 ← TS config with paths
+├── package.json
+│
+└── src/
+    ├── main.tsx                  ← App entry point, all providers
+    ├── App.tsx                   ← Route definitions
+    ├── index.css                 ← Tailwind + custom class utilities
+    │
+    ├── types/index.ts            ← All TypeScript interfaces
+    │
+    ├── lib/
+    │   ├── supabase.ts           ← Supabase client (reads .env)
+    │   ├── queryClient.ts        ← TanStack Query client config
+    │   └── utils.ts              ← cn(), formatDate, health flag helpers
+    │
+    ├── hooks/
+    │   ├── useDashboard.ts       ← KPI queries, weekly chart, due today
+    │   ├── useClients.ts         ← List, single client, add, wellness programs
+    │   ├── useHealthReports.ts   ← Reports list, latest, log new
+    │   ├── useCalls.ts           ← Call logs, log call + create reminder
+    │   ├── useReminders.ts       ← Reminders list, complete, Realtime hook
+    │   ├── useStaffNotes.ts      ← Notes CRUD + pin toggle
+    │   └── useDarkMode.ts        ← Dark mode localStorage toggle
+    │
+    ├── components/
+    │   ├── ui/
+    │   │   ├── Button.tsx        ← 6 variants: primary, secondary, outline, ghost, danger, gold
+    │   │   ├── Card.tsx          ← Glass morphism card
+    │   │   ├── Badge.tsx         ← Status pills (success/warning/danger/gold/silver)
+    │   │   ├── Input.tsx         ← Input, Select, Textarea
+    │   │   ├── Modal.tsx         ← Dialog + mobile bottom sheet
+    │   │   └── Toast.tsx         ← Toast notification system
+    │   └── layout/
+    │       ├── AppLayout.tsx     ← Root layout wrapper
+    │       ├── Sidebar.tsx       ← Desktop nav (collapsible)
+    │       ├── TopBar.tsx        ← Dark mode toggle + notifications + avatar
+    │       └── BottomNav.tsx     ← Mobile bottom nav bar
+    │
+    ├── features/
+    │   ├── auth/
+    │   │   ├── AuthProvider.tsx  ← Session context, profile fetch
+    │   │   ├── AuthGuard.tsx     ← Redirect if not logged in
+    │   │   ├── AuthCallback.tsx  ← Handles Google OAuth redirect
+    │   │   └── LoginPage.tsx     ← Sign in / Register form
+    │   ├── dashboard/
+    │   │   └── DashboardPage.tsx ← KPIs + charts + activity feed
+    │   ├── clients/
+    │   │   ├── ClientsPage.tsx   ← Client grid + search + filters
+    │   │   └── AddClientModal.tsx← Add new client form modal
+    │   ├── profile/
+    │   │   └── ClientProfilePage.tsx ← 4-tab profile view
+    │   ├── health/
+    │   │   ├── LatestReportTab.tsx   ← Latest metrics + log form
+    │   │   └── HealthHistoryTab.tsx  ← Table + trend chart
+    │   ├── calls/
+    │   │   ├── CallButton.tsx        ← Smart call button
+    │   │   ├── CallEndedModal.tsx    ← Log outcome + reminder
+    │   │   └── CallLogsTab.tsx       ← Call history list
+    │   ├── reminders/
+    │   │   └── RemindersPage.tsx     ← Reminders with Realtime
+    │   ├── notes/
+    │   │   └── StaffNotesTab.tsx     ← Staff notes per client
+    │   └── notifications/
+    │       └── NotificationBell.tsx  ← Bell + dropdown
+    │
+    └── supabase/
+        └── migrations/
+            ├── 001_schema.sql    ← CREATE TABLE statements
+            ├── 002_rls.sql       ← Row Level Security policies
+            ├── 003_triggers.sql  ← Health flags, audit trail, Realtime
+            └── 004_seed.sql      ← 6 wellness programs (sample data)
+
+═══════════════════════════════════════════════════════════════════════════════
+SETUP STEPS (QUICK REFERENCE)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. npm install
+2. Create Supabase project at https://supabase.com
+3. Run SQL files in Supabase SQL Editor in order: 001 → 002 → 003 → 004
+4. Copy .env.example to .env, fill in VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
+5. (Optional) Enable Google OAuth in Supabase Auth → Providers → Google
+6. npm run dev → http://localhost:5173
+
+═══════════════════════════════════════════════════════════════════════════════
+DESIGN SYSTEM
+═══════════════════════════════════════════════════════════════════════════════
+
+Colors:
+  Primary (Green)  → emerald-500 (#10B981)
+  Secondary (Sky)  → sky-500 (#0EA5E9)
+  Accent (Blue)    → blue-600 (#3B82F6)
+  Gold             → #D4AF37 (custom token: gold-500)
+  Silver           → #C0C0C0 (custom token: silver-400)
+  Background Dark  → slate-950 (#0A0F1A)
+
+Typography:
+  Font: Inter (Google Fonts) — weights 300, 400, 500, 600, 700, 800
+
+Gradients:
+  Brand gradient → from-emerald-500 via-sky-500 to-blue-600
+  Gold gradient  → from-gold-500 via-gold-300 to-gold-600
+
+Effects:
+  Glass card     → bg-slate-900/60 + backdrop-blur + border border-slate-700/50
+  Shadow Brand   → 0 4px 24px rgba(16,185,129,0.25)
+  Animations     → fadeIn, slideUp, scaleIn (CSS keyframes via Tailwind)
+
+═══════════════════════════════════════════════════════════════════════════════
