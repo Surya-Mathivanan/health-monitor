@@ -44,6 +44,8 @@ HOW THE APP WORKS — END TO END FLOW
    Option C — Register:
    • Calls supabase.auth.signUp() → Supabase sends confirmation email
    • Also inserts a row into public.users with display_name and role='staff'
+   • Role can be 'admin' | 'staff' | 'co_partner' (co_partner is created by
+     an admin via the Co-Partners page — they never self-register)
 
    JWT Handling:
    • Supabase Auth manages JWT tokens entirely
@@ -175,18 +177,107 @@ HOW THE APP WORKS — END TO END FLOW
     • Toggling adds/removes 'dark' class on <html> element
     • Tailwind's dark: variant applies dark-mode styles throughout the app
 
+11. USER PROFILE PAGE  ← PREVIOUSLY UNDOCUMENTED
+    ─────────────────────────────────────────────
+    File: src/features/profile/UserProfilePage.tsx
+    Route: /profile (accessible from TopBar avatar)
+
+    Displays and allows editing of the logged-in staff member's profile:
+    • Avatar (initials in brand gradient circle)
+    • Display Name (editable)
+    • Email (read-only — managed by Supabase Auth)
+    • Position      e.g. Doctor, Nutritionist, Fitness Coach
+    • Personal Number  (their personal contact number)
+    • Degree / Qualification  e.g. MD, B.Sc. Nutrition
+    • Experience    e.g. 10 years in healthcare
+
+    Edit / Save / Cancel flow:
+    • Clicking the pencil icon switches to edit mode
+    • On Save: UPDATE public.users SET position, personal_number,
+      degree, experience, display_name WHERE id = auth.uid()
+    • DoctorProfileCard.tsx renders the read-only card view
+
+12. CO-PARTNERS SYSTEM  ← PREVIOUSLY UNDOCUMENTED
+    ─────────────────────────────────────────────
+    Files: src/features/copartners/CoPartnersPage.tsx
+           src/hooks/useCoPartners.ts
+    Route: /co-partners
+
+    What it does:
+    Allows a staff member (supervisor) to add "co-partners" — other staff
+    users whose client lists they can monitor. Each co-partner has their own
+    login and manages their own clients independently; the supervisor can only
+    VIEW (not edit) those clients.
+
+    The Page has 3 sections:
+    ┌─────────────────────────────────────────────────────────┐
+    │ KPI Cards                                               │
+    │  • Active Partners count                                │
+    │  • Total clients under all partners                     │
+    │  • Pending requests count                               │
+    ├─────────────────────────────────────────────────────────┤
+    │ Received Invitations Banner                             │
+    │  Polls every 30s. Shows partner requests from others.   │
+    │  Accept / Decline buttons per invitation.               │
+    ├─────────────────────────────────────────────────────────┤
+    │ Pending Requests (sent by me, awaiting response)        │
+    │  Each row: invitee email, time sent, Cancel button      │
+    ├─────────────────────────────────────────────────────────┤
+    │ Active Partners list                                    │
+    │  Search bar (visible when >3 partners)                  │
+    │  Each card: avatar, name, email, client count           │
+    │  Buttons: View (drill-in) / Remove (with confirm)       │
+    └─────────────────────────────────────────────────────────┘
+
+    Add Co-Partner — 2-Step Modal (InviteModal.tsx inside CoPartnersPage):
+    Step 1: Enter email → "Check Email" button
+      → Queries public.users for that email
+      → Found:     shows user name + "Send Partner Request" button
+      → Not found: shows "Create Account for Them" button
+    Step 2a (existing user): Confirm card → "Send Request"
+      → INSERT into co_partner_invitations status='pending'
+      → They see it in their Received Invitations banner
+    Step 2b (new user): Create form (display_name, email, password)
+      → "Create & Link" button
+      → Uses a TEMPORARY Supabase client (persistSession: false)
+        to call auth.signUp() without replacing the admin session
+      → Calls RPC register_new_co_partner() to insert public.users
+        row + accepted invitation in one SECURITY DEFINER transaction
+
+    Partner Detail View (CoPartnerDetail component):
+    • Drill-in from partner card → back button to list
+    • Header: avatar, name, email, join date, client count
+    • Searchable client list (read-only, shows gender/age/mobile/status)
+
+    Hooks exported from useCoPartners.ts:
+    • useCheckEmail(email)            → lookup by email
+    • useCoPartners()                 → accepted partners list with client counts
+    • useSentPendingInvitations()     → invitations I sent, still pending
+    • useReceivedInvitations()        → invitations sent to me, pending
+    • useCoPartnerClients(partnerId)  → clients belonging to a partner
+    • useSendInvitation()             → INSERT invitation for existing user
+    • useCreateCoPartner()            → signUp + RPC (isolated temp client)
+    • useAcceptInvitation()           → RPC accept_co_partner_invitation()
+    • useDeclineInvitation()          → RPC decline_co_partner_invitation()
+    • useRemoveCoPartner()            → DELETE invitation row
+    • useCoPartnersSummary()          → KPI totals for dashboard
+
 ═══════════════════════════════════════════════════════════════════════════════
 DATABASE TABLES AND THEIR PURPOSE
 ═══════════════════════════════════════════════════════════════════════════════
 
 users              → Mirrors Supabase Auth. Stores display_name, avatar_url, role
-                     role = 'staff' (default) or 'admin'
+                     role = 'admin' | 'staff' | 'co_partner'
+                     Extended profile columns (for UserProfilePage):
+                       position, personal_number, degree, experience
 
 wellness_programs  → Seeded with 6 programs (Weight Loss, Muscle Gain, etc.)
                      Staff can assign a program to each client
 
 clients            → Core client record: demographics, height, weight, program
                      status = 'active' | 'inactive'
+                     created_by (UUID FK → users.id) — tracks which staff
+                     member owns each client. Used for co-partner RLS isolation.
 
 health_reports     → One row per body scan / measurement session
                      Postgres trigger auto-fills: bmi_status, visceral_flag
@@ -205,15 +296,28 @@ notifications      → In-app alerts per user. Realtime publication enabled.
 audit_logs         → Automatic write log. Every INSERT/UPDATE/DELETE on key 
                      tables is recorded here via Postgres trigger
 
+co_partner_invitations  ← PREVIOUSLY UNDOCUMENTED
+                     Manages supervisor–partner relationships.
+                     inviter_id  → the supervisor (staff/admin)
+                     invitee_email / invitee_id → the co-partner
+                     status = 'pending' | 'accepted' | 'declined'
+                     UNIQUE(inviter_id, invitee_email)
+                     RLS: inviters see sent rows; invitees see received rows
+
 ═══════════════════════════════════════════════════════════════════════════════
 SECURITY MODEL
 ═══════════════════════════════════════════════════════════════════════════════
 
 • Every table has Row Level Security (RLS) enabled
-• Staff users can only see/write their own data (assigned_to = auth.uid())
-• Clients table is readable by ALL authenticated staff
-• Admin role bypasses restrictions via is_admin() Postgres function
+• Staff users can only see their OWN clients (created_by = auth.uid())
+• Co-partners can only see their own clients — no cross-visibility
+• Supervisors (inviters) can see their co-partners' clients, health_reports,
+  call_logs, staff_notes, and reminders (via co_partner_invitations lookup)
+• Admin role bypasses all restrictions via is_admin() Postgres function
+• is_co_partner() helper function checks role = 'co_partner'
 • .env file is gitignored — credentials NEVER go to Git
+• Creating a co-partner account uses a temp Supabase client
+  (persistSession: false) to prevent the admin session being overwritten
 
 ═══════════════════════════════════════════════════════════════════════════════
 DATA FLOW DIAGRAM
@@ -270,6 +374,7 @@ Health Monitor Web/
     │   ├── useCalls.ts           ← Call logs, log call + create reminder
     │   ├── useReminders.ts       ← Reminders list, complete, Realtime hook
     │   ├── useStaffNotes.ts      ← Notes CRUD + pin toggle
+    │   ├── useCoPartners.ts      ← All co-partner queries + mutations (11 exports)
     │   └── useDarkMode.ts        ← Dark mode localStorage toggle
     │
     ├── components/
@@ -298,7 +403,9 @@ Health Monitor Web/
     │   │   ├── ClientsPage.tsx   ← Client grid + search + filters
     │   │   └── AddClientModal.tsx← Add new client form modal
     │   ├── profile/
-    │   │   └── ClientProfilePage.tsx ← 4-tab profile view
+    │   │   ├── ClientProfilePage.tsx  ← 4-tab profile view
+    │   │   ├── UserProfilePage.tsx    ← Staff member's own profile (edit)
+    │   │   └── DoctorProfileCard.tsx  ← Read-only profile card component
     │   ├── health/
     │   │   ├── LatestReportTab.tsx   ← Latest metrics + log form
     │   │   └── HealthHistoryTab.tsx  ← Table + trend chart
@@ -310,15 +417,29 @@ Health Monitor Web/
     │   │   └── RemindersPage.tsx     ← Reminders with Realtime
     │   ├── notes/
     │   │   └── StaffNotesTab.tsx     ← Staff notes per client
+    │   ├── copartners/
+    │   │   └── CoPartnersPage.tsx    ← Co-partner management + invite modal
     │   └── notifications/
     │       └── NotificationBell.tsx  ← Bell + dropdown
     │
     └── supabase/
         └── migrations/
-            ├── 001_schema.sql    ← CREATE TABLE statements
-            ├── 002_rls.sql       ← Row Level Security policies
-            ├── 003_triggers.sql  ← Health flags, audit trail, Realtime
-            └── 004_seed.sql      ← 6 wellness programs (sample data)
+            ├── 001_schema.sql              ← CREATE TABLE statements
+            ├── 002_rls.sql                 ← Row Level Security policies
+            ├── 003_triggers.sql            ← Health flags, audit trail, Realtime
+            ├── 004_seed.sql                ← 6 wellness programs (sample data)
+            ├── 005_copartners.sql          ← Adds co_partner role constraint,
+            │                                  idx_clients_created_by index,
+            │                                  is_co_partner() helper function
+            ├── 006_copartner_invitations.sql ← co_partner_invitations table + RLS
+            │                                  + 3 SECURITY DEFINER RPCs:
+            │                                  register_new_co_partner()
+            │                                  accept_co_partner_invitation()
+            │                                  decline_co_partner_invitation()
+            └── 007_fix_client_rls.sql      ← Replaces broad clients_select policy
+                                              with scoped supervisor+own view.
+                                              Also fixes health_reports, call_logs,
+                                              staff_notes, reminders policies.
 
 ═══════════════════════════════════════════════════════════════════════════════
 SETUP STEPS (QUICK REFERENCE)
@@ -326,10 +447,12 @@ SETUP STEPS (QUICK REFERENCE)
 
 1. npm install
 2. Create Supabase project at https://supabase.com
-3. Run SQL files in Supabase SQL Editor in order: 001 → 002 → 003 → 004
+3. Run SQL files in Supabase SQL Editor in order: 001 → 002 → 003 → 004 → 005 → 006 → 007
 4. Copy .env.example to .env, fill in VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY
 5. (Optional) Enable Google OAuth in Supabase Auth → Providers → Google
-6. npm run dev → http://localhost:5173
+6. Disable email confirmation in Supabase Auth → Settings → Email
+   (Required for Co-Partners: Create & Link flow works without confirmation)
+7. npm run dev → http://localhost:5173
 
 ═══════════════════════════════════════════════════════════════════════════════
 DESIGN SYSTEM

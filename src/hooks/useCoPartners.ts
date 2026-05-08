@@ -18,23 +18,6 @@ export interface CoPartnerInvitation {
   created_at: string;
 }
 
-// ─── Check if an email already exists in public.users ───────────────────────
-export function useCheckEmail(email: string) {
-  return useQuery({
-    queryKey: ['check-email', email],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('users')
-        .select('id, email, display_name')
-        .eq('email', email.trim().toLowerCase())
-        .maybeSingle();
-      return data as { id: string; email: string; display_name: string } | null;
-    },
-    enabled: !!email && email.includes('@') && email.includes('.'),
-    retry: false,
-    staleTime: 10_000,
-  });
-}
 
 // ─── Accepted co-partners of the current user ────────────────────────────────
 export function useCoPartners() {
@@ -140,70 +123,19 @@ export function useCoPartnerClients(partnerId: string) {
   });
 }
 
-// ─── Invite an EXISTING user to be a co-partner ──────────────────────────────
-export function useSendInvitation() {
-  const { user } = useAuth();
+// ─── Invite a co-partner (calls Edge Function) ──────────────────────────────
+export function useInviteCoPartner() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ email, existingUserId }: { email: string; existingUserId: string }) => {
-      const { error } = await supabase
-        .from('co_partner_invitations')
-        .insert({
-          inviter_id: user!.id,
-          invitee_email: email,
-          invitee_id: existingUserId,
-          status: 'pending',
-        });
+    mutationFn: async ({ email, display_name }: { email: string; display_name?: string }) => {
+      const { data, error } = await supabase.functions.invoke('invite-copartner', {
+        body: { email, display_name },
+      });
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['co-partners-pending'] });
-    },
-  });
-}
-
-// ─── Create a NEW user account + immediately link as partner ─────────────────
-export function useCreateCoPartner() {
-  const { user } = useAuth();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ email, password, display_name }: {
-      email: string; password: string; display_name: string;
-    }) => {
-      // ── KEY FIX: Use a completely separate Supabase client instance for signUp.
-      // When email confirmation is disabled, supabase.auth.signUp() immediately
-      // replaces the current session with the new user's session, causing the
-      // admin to be "logged in as" the co-partner and see their data. Using an
-      // isolated temp client (persistSession: false) prevents session replacement.
-      const { createClient } = await import('@supabase/supabase-js');
-      const tempClient = createClient(
-        import.meta.env.VITE_SUPABASE_URL as string,
-        import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-        { auth: { persistSession: false, autoRefreshToken: false } }
-      );
-
-      const { data: res, error: signUpError } = await tempClient.auth.signUp({
-        email,
-        password,
-        options: { data: { display_name } },
-      });
-
-      // Immediately clean up temp client — admin session is completely untouched
-      await tempClient.auth.signOut();
-
-      if (signUpError) throw signUpError;
-      if (!res.user) throw new Error('Failed to create auth account.');
-
-      // 2. Use the MAIN client (admin session intact) to call the SECURITY DEFINER RPC
-      const { error: rpcError } = await supabase.rpc('register_new_co_partner', {
-        p_user_id: res.user.id,
-        p_email: email,
-        p_display_name: display_name,
-        p_inviter_id: user!.id,
-      });
-      if (rpcError) throw rpcError;
-    },
-    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['co-partners'] });
     },
   });

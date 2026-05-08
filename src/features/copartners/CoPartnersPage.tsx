@@ -9,9 +9,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   useCoPartners, useSentPendingInvitations, useReceivedInvitations,
-  useCoPartnerClients, useCreateCoPartner, useSendInvitation,
+  useCoPartnerClients, useInviteCoPartner,
   useRemoveCoPartner, useAcceptInvitation, useDeclineInvitation,
-  useCheckEmail, type CoPartner, type CoPartnerInvitation,
+  type CoPartner, type CoPartnerInvitation,
 } from '@/hooks/useCoPartners';
 import { Card, CardContent, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -22,76 +22,29 @@ import { formatRelative } from '@/lib/utils';
 import type { Client } from '@/types';
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
-const emailSchema = z.object({ email: z.string().email('Enter a valid email') });
-const newUserSchema = z.object({
-  display_name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email(),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+const inviteSchema = z.object({
+  email: z.string().email('Enter a valid email'),
+  display_name: z.string().optional(),
 });
-type EmailForm = z.infer<typeof emailSchema>;
-type NewUserForm = z.infer<typeof newUserSchema>;
+type InviteForm = z.infer<typeof inviteSchema>;
 
-// ─── 2-Step Invite Modal ──────────────────────────────────────────────────────
+// ─── Invite Modal ─────────────────────────────────────────────────────────────
 function InviteModal({ onClose }: { onClose: () => void }) {
-  const [step, setStep] = useState<'email' | 'invite' | 'create'>('email');
-  const [checkedEmail, setCheckedEmail] = useState('');
-  const [foundUser, setFoundUser] = useState<{ id: string; display_name: string } | null>(null);
-  const [showPass, setShowPass] = useState(false);
   const [apiError, setApiError] = useState('');
+  
+  const form = useForm<InviteForm>({ resolver: zodResolver(inviteSchema) });
+  const inviteCoPartner = useInviteCoPartner();
 
-  const emailForm = useForm<EmailForm>({ resolver: zodResolver(emailSchema) });
-  const newUserForm = useForm<NewUserForm>({ resolver: zodResolver(newUserSchema) });
-
-  const { data: emailCheck, isFetching: checking } = useCheckEmail(checkedEmail);
-  const sendInvitation = useSendInvitation();
-  const createCoPartner = useCreateCoPartner();
-
-  async function handleEmailSubmit(data: EmailForm) {
-    setApiError('');
-    setCheckedEmail(data.email);
-    // Wait for query to resolve via useEffect-like approach — just use the data from next render
-    // We'll trigger check and show the right step
-    setTimeout(() => {
-      setStep(emailCheck !== undefined ? (emailCheck ? 'invite' : 'create') : 'create');
-    }, 600);
-  }
-
-  // Once emailCheck resolves after checkedEmail is set, navigate to correct step
-  const handleProceed = () => {
-    if (emailCheck) {
-      setFoundUser({ id: emailCheck.id, display_name: emailCheck.display_name });
-      setStep('invite');
-    } else {
-      newUserForm.setValue('email', checkedEmail);
-      setStep('create');
-    }
-  };
-
-  async function handleSendInvite() {
-    if (!foundUser) return;
+  async function handleSubmit(data: InviteForm) {
     setApiError('');
     try {
-      await sendInvitation.mutateAsync({ email: checkedEmail, existingUserId: foundUser.id });
-      onClose();
-    } catch (e: any) {
-      setApiError(e?.message ?? 'Failed to send invitation.');
-    }
-  }
-
-  async function handleCreate(data: NewUserForm) {
-    setApiError('');
-    try {
-      // Zod has already validated these fields exist — the ! assertions are safe.
-      // react-hook-form types handleSubmit data as DeepPartial internally, causing
-      // a TS mismatch with mutateAsync which requires all fields non-optional.
-      await createCoPartner.mutateAsync({
-        email: data.email!,
-        password: data.password!,
-        display_name: data.display_name!,
+      await inviteCoPartner.mutateAsync({
+        email: data.email,
+        display_name: data.display_name,
       });
       onClose();
     } catch (e: any) {
-      setApiError(e?.message ?? 'Failed to create account. The email may already be in use.');
+      setApiError(e?.message ?? 'Failed to send invitation.');
     }
   }
 
@@ -102,21 +55,12 @@ function InviteModal({ onClose }: { onClose: () => void }) {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            {step !== 'email' && (
-              <button onClick={() => setStep('email')} className="p-1 rounded-lg text-slate-400 hover:text-white">
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-            )}
             <div className="w-10 h-10 rounded-xl bg-violet-500/20 text-violet-400 flex items-center justify-center">
               <UserPlus className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">
-                {step === 'email' ? 'Add Co-Partner' : step === 'invite' ? 'Send Invitation' : 'Create Account'}
-              </h2>
-              <p className="text-xs text-slate-400">
-                {step === 'email' ? 'Enter their email to get started' : step === 'invite' ? 'User already exists — invite them' : 'New user — set up their account'}
-              </p>
+              <h2 className="text-lg font-bold text-white">Add Co-Partner</h2>
+              <p className="text-xs text-slate-400">Invite someone to manage clients with you</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
@@ -130,122 +74,35 @@ function InviteModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {/* Step 1: Email */}
-        {step === 'email' && (
-          <div className="space-y-4">
-            <form onSubmit={emailForm.handleSubmit(handleEmailSubmit)} className="space-y-4">
-              <Input
-                id="invite-email"
-                label="Gmail / Email Address"
-                type="email"
-                placeholder="partner@gmail.com"
-                leftIcon={<Mail className="w-4 h-4" />}
-                error={emailForm.formState.errors.email?.message}
-                {...emailForm.register('email')}
-              />
-              <Button type="submit" className="w-full" loading={checking || emailForm.formState.isSubmitting}>
-                Check Email
-              </Button>
-            </form>
-
-            {/* Show result after check */}
-            {checkedEmail && !checking && emailCheck !== undefined && (
-              <div className={`p-4 rounded-xl border ${emailCheck ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-amber-500/10 border-amber-500/30'}`}>
-                {emailCheck ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      <p className="text-sm text-emerald-400 font-medium">User found: <span className="text-white">{emailCheck.display_name}</span></p>
-                    </div>
-                    <p className="text-xs text-slate-400">We'll send them a partner request. They can accept or decline from their dashboard.</p>
-                    <Button className="w-full" onClick={handleProceed} leftIcon={<Send className="w-4 h-4" />}>
-                      Send Partner Request
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <XCircle className="w-4 h-4 text-amber-400" />
-                      <p className="text-sm text-amber-400 font-medium">Not registered yet</p>
-                    </div>
-                    <p className="text-xs text-slate-400">Create an account for them and they'll be immediately linked as your partner.</p>
-                    <Button className="w-full" onClick={handleProceed} leftIcon={<UserPlus className="w-4 h-4" />}>
-                      Create Account for Them
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <Input
+            id="invite-email"
+            label="Email Address"
+            type="email"
+            placeholder="partner@example.com"
+            leftIcon={<Mail className="w-4 h-4" />}
+            error={form.formState.errors.email?.message}
+            {...form.register('email')}
+          />
+          <Input
+            id="invite-name"
+            label="Full Name (Optional)"
+            type="text"
+            placeholder="Jane Doe"
+            leftIcon={<User className="w-4 h-4" />}
+            error={form.formState.errors.display_name?.message}
+            {...form.register('display_name')}
+          />
+          <p className="text-xs text-slate-400 mb-2">
+            If they are already registered, they will receive an in-app notification. If they are new, they will receive an email to create their account.
+          </p>
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+            <Button type="submit" className="flex-1" loading={form.formState.isSubmitting || inviteCoPartner.isPending} leftIcon={<Send className="w-4 h-4" />}>
+              Send Invitation
+            </Button>
           </div>
-        )}
-
-        {/* Step 2a: Send invitation to existing user */}
-        {step === 'invite' && foundUser && (
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/40 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-violet-500/20 text-violet-400 flex items-center justify-center text-lg font-bold">
-                {foundUser.display_name.charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <p className="font-medium text-white">{foundUser.display_name}</p>
-                <p className="text-sm text-slate-400">{checkedEmail}</p>
-              </div>
-            </div>
-            <p className="text-sm text-slate-400">
-              A partner request will be sent. They'll see a notification and can accept or decline.
-            </p>
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setStep('email')}>Back</Button>
-              <Button className="flex-1" loading={sendInvitation.isPending} onClick={handleSendInvite} leftIcon={<Send className="w-4 h-4" />}>
-                Send Request
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2b: Create new account */}
-        {step === 'create' && (
-          <form onSubmit={newUserForm.handleSubmit(handleCreate)} className="space-y-4">
-            <Input
-              id="cp-name"
-              label="Full Name"
-              type="text"
-              placeholder="Jane Doe"
-              leftIcon={<User className="w-4 h-4" />}
-              error={newUserForm.formState.errors.display_name?.message}
-              {...newUserForm.register('display_name')}
-            />
-            <Input
-              id="cp-email-new"
-              label="Email"
-              type="email"
-              defaultValue={checkedEmail}
-              leftIcon={<Mail className="w-4 h-4" />}
-              error={newUserForm.formState.errors.email?.message}
-              {...newUserForm.register('email')}
-            />
-            <Input
-              id="cp-password"
-              label="Password"
-              type={showPass ? 'text' : 'password'}
-              placeholder="Min. 6 characters"
-              leftIcon={<Lock className="w-4 h-4" />}
-              rightIcon={
-                <button type="button" onClick={() => setShowPass(s => !s)}>
-                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              }
-              error={newUserForm.formState.errors.password?.message}
-              {...newUserForm.register('password')}
-            />
-            <div className="flex gap-3">
-              <Button type="button" variant="outline" className="flex-1" onClick={() => setStep('email')}>Back</Button>
-              <Button id="create-cp-btn" type="submit" className="flex-1" loading={newUserForm.formState.isSubmitting || createCoPartner.isPending}>
-                Create & Link
-              </Button>
-            </div>
-          </form>
-        )}
+        </form>
       </div>
     </div>
   );
