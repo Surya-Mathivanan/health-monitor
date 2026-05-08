@@ -223,3 +223,28 @@ No additional deployment needed — Supabase manages the database, auth, and Rea
 ## 📄 License
 
 MIT © LifeCare Wellness
+
+
+
+```
+
+-- Clear all app data AND all auth users
+-- WARNING: This logs everyone out and removes all accounts permanently
+
+TRUNCATE TABLE
+  public.co_partner_invitations,
+  public.audit_logs,
+  public.notifications,
+  public.staff_notes,
+  public.reminders,
+  public.call_logs,
+  public.health_reports,
+  public.clients,
+  public.wellness_programs,
+  public.users
+CASCADE;
+
+-- Delete all auth/login users
+DELETE FROM auth.users;
+
+```

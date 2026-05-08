@@ -8,6 +8,7 @@ import { ClientsPage } from '@/features/clients/ClientsPage';
 import { ClientProfilePage } from '@/features/profile/ClientProfilePage';
 import { UserProfilePage } from '@/features/profile/UserProfilePage';
 import { RemindersPage } from '@/features/reminders/RemindersPage';
+import { CoPartnersPage } from '@/features/copartners/CoPartnersPage';
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
                 <Route path="clients/:id" element={<ClientProfilePage />} />
                 <Route path="profile" element={<UserProfilePage />} />
                 <Route path="reminders" element={<RemindersPage />} />
+                <Route path="co-partners" element={<CoPartnersPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </AppLayout>

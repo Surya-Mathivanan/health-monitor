@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Bell, LogOut, Heart,
-  Settings, ChevronLeft, ChevronRight, Shield
+  Settings, ChevronLeft, ChevronRight, Shield, Users2
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -10,13 +10,10 @@ import { getInitials } from '@/lib/utils';
 // import { DoctorProfileCard } from '@/features/profile/DoctorProfileCard';
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/clients',   label: 'Clients',   icon: Users },
-  { to: '/reminders', label: 'Reminders', icon: Bell },
-];
-
-const adminItems = [
-  { to: '/admin', label: 'Admin', icon: Shield },
+  { to: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
+  { to: '/clients',     label: 'Clients',     icon: Users },
+  { to: '/reminders',  label: 'Reminders',   icon: Bell },
+  { to: '/co-partners', label: 'Co-Partners', icon: Users2 },
 ];
 
 export function Sidebar() {
@@ -59,25 +56,7 @@ export function Sidebar() {
           </NavLink>
         ))}
 
-        {profile?.role === 'admin' && (
-          <>
-            <div className={cn('mt-3 mb-1 px-4 text-[10px] uppercase tracking-widest text-slate-600 font-semibold', collapsed && 'hidden')}>
-              Admin
-            </div>
-            {adminItems.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  cn(isActive ? 'nav-link-active' : 'nav-link', collapsed && 'justify-center px-2')
-                }
-              >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && <span>{label}</span>}
-              </NavLink>
-            ))}
-          </>
-        )}
+
       </nav>
 
       {/* Doctor Profile Card */}

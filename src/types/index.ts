@@ -1,6 +1,6 @@
 // ─── Database Row Types ─────────────────────────────────────────────────────
 
-export type UserRole = 'admin' | 'staff';
+export type UserRole = 'admin' | 'staff' | 'co_partner';
 export type ClientStatus = 'active' | 'inactive';
 export type CallOutcome = 'connected' | 'missed' | 'voicemail';
 export type ReminderStatus = 'pending' | 'completed' | 'snoozed';

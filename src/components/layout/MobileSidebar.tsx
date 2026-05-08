@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { X, LayoutDashboard, Users, Bell, LogOut, Heart, User, Sun, Moon } from 'lucide-react';
+import { X, LayoutDashboard, Users, Bell, LogOut, Heart, User, Sun, Moon, Users2 } from 'lucide-react';
 import { cn, getInitials } from '@/lib/utils';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { useDarkMode } from '@/hooks/useDarkMode';
@@ -15,10 +15,11 @@ export function MobileSidebar({ isOpen, onClose }: MobileSidebarProps) {
   const { dark, toggle } = useDarkMode();
 
   const navItems = [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/clients',   label: 'Clients',   icon: Users },
-    { to: '/reminders', label: 'Reminders', icon: Bell },
-    { to: '/profile',   label: 'My Profile', icon: User },
+    { to: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard },
+    { to: '/clients',     label: 'Clients',     icon: Users },
+    { to: '/reminders',  label: 'Reminders',   icon: Bell },
+    { to: '/co-partners', label: 'Co-Partners', icon: Users2 },
+    { to: '/profile',    label: 'My Profile',  icon: User },
   ];
 
   const handleProfileClick = () => {

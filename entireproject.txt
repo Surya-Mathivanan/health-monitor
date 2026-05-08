@@ -1,0 +1,620 @@
+LIFECARE WELLNESS — COMPLETE REACT NATIVE REBUILD PROMPT
+=========================================================
+
+Build a full React Native mobile application called "LifeCare Wellness" — a health monitoring and client management system for wellness coaches and advisors. Use Expo (with Expo Router for navigation), Supabase as the backend (auth + database + realtime), React Query (@tanstack/react-query) for data fetching, Zod + React Hook Form for form validation, and NativeWind (TailwindCSS for React Native) for styling.
+
+═══════════════════════════════════════════════════════════
+TECH STACK
+═══════════════════════════════════════════════════════════
+
+- Framework: React Native with Expo SDK 51+
+- Navigation: Expo Router (file-based routing)
+- Backend: Supabase (auth, PostgreSQL database, realtime subscriptions)
+- State/Data: @tanstack/react-query v5
+- Forms: react-hook-form + @hookform/resolvers + zod
+- Styling: NativeWind v4 (Tailwind for RN) — dark theme throughout
+- Icons: react-native-vector-icons (Lucide-style) or @expo/vector-icons
+- Charts: react-native-gifted-charts or victory-native
+- Dates: date-fns
+- Notifications: Expo Notifications (local)
+
+═══════════════════════════════════════════════════════════
+DESIGN SYSTEM
+═══════════════════════════════════════════════════════════
+
+Use a premium dark theme throughout:
+  i want rich royal colors with stylish modern ui
+═══════════════════════════════════════════════════════════
+SUPABASE DATABASE SCHEMA
+═══════════════════════════════════════════════════════════
+
+Run these SQL migrations in Supabase SQL Editor in order:
+
+--- TABLE: users (mirrors auth.users) ---
+CREATE TABLE public.users (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT UNIQUE NOT NULL,
+  display_name TEXT NOT NULL DEFAULT '',
+  avatar_url TEXT,
+  role TEXT NOT NULL DEFAULT 'staff' CHECK (role IN ('admin', 'staff', 'co_partner')),
+  position TEXT, personal_number TEXT, degree TEXT, experience TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+--- TABLE: wellness_programs ---
+CREATE TABLE public.wellness_programs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  target_metrics JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+--- TABLE: clients ---
+CREATE TABLE public.clients (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  full_name TEXT NOT NULL,
+  mobile TEXT NOT NULL,
+  age INTEGER NOT NULL CHECK (age BETWEEN 1 AND 120),
+  gender TEXT NOT NULL CHECK (gender IN ('male','female','other')),
+  height_cm NUMERIC(5,1) NOT NULL,
+  weight_kg NUMERIC(5,1) NOT NULL,
+  assigned_program_id UUID REFERENCES public.wellness_programs(id) ON DELETE SET NULL,
+  created_by UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+--- TABLE: health_reports ---
+CREATE TABLE public.health_reports (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  body_fat_pct NUMERIC(5,2) NOT NULL,
+  visceral_fat NUMERIC(4,1) NOT NULL,
+  bmi NUMERIC(4,1) NOT NULL,
+  resting_bmr INTEGER NOT NULL,
+  body_age INTEGER NOT NULL,
+  skeletal_muscle_mass NUMERIC(5,2) NOT NULL,
+  bmi_status TEXT NOT NULL DEFAULT 'normal' CHECK (bmi_status IN ('underweight','normal','overweight','obese')),
+  visceral_flag TEXT NOT NULL DEFAULT 'normal' CHECK (visceral_flag IN ('normal','high','very_high')),
+  logged_by UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+--- TABLE: call_logs ---
+CREATE TABLE public.call_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  called_by UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
+  called_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  duration_seconds INTEGER,
+  outcome TEXT NOT NULL CHECK (outcome IN ('connected','missed','voicemail')),
+  discussion_notes TEXT,
+  follow_up_required BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+--- TABLE: reminders ---
+CREATE TABLE public.reminders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  assigned_to UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  due_at TIMESTAMPTZ NOT NULL,
+  title TEXT NOT NULL,
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','completed','snoozed')),
+  linked_call_id UUID REFERENCES public.call_logs(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+--- TABLE: staff_notes ---
+CREATE TABLE public.staff_notes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  client_id UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
+  content TEXT NOT NULL,
+  is_pinned BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+--- TABLE: notifications ---
+CREATE TABLE public.notifications (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  body TEXT,
+  type TEXT NOT NULL DEFAULT 'system' CHECK (type IN ('follow_up','system')),
+  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+--- TABLE: audit_logs ---
+CREATE TABLE public.audit_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  actor_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  table_name TEXT NOT NULL,
+  record_id UUID,
+  changed_fields JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+--- TABLE: co_partner_invitations ---
+CREATE TABLE public.co_partner_invitations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  inviter_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  invitee_email TEXT NOT NULL,
+  invitee_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(inviter_id, invitee_email)
+);
+
+--- INDEXES ---
+CREATE INDEX idx_clients_status ON public.clients(status);
+CREATE INDEX idx_clients_created_by ON public.clients(created_by);
+CREATE INDEX idx_health_reports_client ON public.health_reports(client_id, recorded_at DESC);
+CREATE INDEX idx_call_logs_client ON public.call_logs(client_id, called_at DESC);
+CREATE INDEX idx_reminders_status ON public.reminders(status, due_at);
+CREATE INDEX idx_reminders_assigned ON public.reminders(assigned_to, status);
+CREATE INDEX idx_invitations_inviter ON public.co_partner_invitations(inviter_id, status);
+CREATE INDEX idx_invitations_email ON public.co_partner_invitations(invitee_email, status);
+
+--- RLS POLICIES ---
+Enable RLS on all tables. Key rules:
+
+1. users: SELECT for any authenticated user. INSERT only own row (id = auth.uid()). UPDATE own row.
+
+2. clients: SELECT where created_by = auth.uid() OR user is admin OR created_by is an accepted co-partner of the viewer (check co_partner_invitations). INSERT if authenticated. UPDATE if authenticated. DELETE only admin.
+
+3. health_reports, call_logs, staff_notes: SELECT only for clients the current user can see (same logic as clients). INSERT own records only.
+
+4. reminders: SELECT where assigned_to = auth.uid() OR client is supervised. INSERT if authenticated. UPDATE own or admin.
+
+5. co_partner_invitations: Inviters see sent invitations. Invitees see received invitations (by email or invitee_id). Any authenticated user can INSERT (inviter_id = auth.uid()). Invitees can UPDATE status.
+
+--- SECURITY DEFINER FUNCTIONS ---
+
+-- Register new co-partner (bypasses RLS):
+CREATE OR REPLACE FUNCTION public.register_new_co_partner(
+  p_user_id UUID, p_email TEXT, p_display_name TEXT, p_inviter_id UUID
+) RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  INSERT INTO public.users (id, email, display_name, role)
+  VALUES (p_user_id, p_email, p_display_name, 'co_partner')
+  ON CONFLICT (id) DO UPDATE SET role='co_partner', display_name=EXCLUDED.display_name, email=EXCLUDED.email;
+  INSERT INTO public.co_partner_invitations (inviter_id, invitee_email, invitee_id, status)
+  VALUES (p_inviter_id, p_email, p_user_id, 'accepted')
+  ON CONFLICT (inviter_id, invitee_email) DO UPDATE SET invitee_id=EXCLUDED.invitee_id, status='accepted', updated_at=NOW();
+END; $$;
+
+-- Accept co-partner invitation:
+CREATE OR REPLACE FUNCTION public.accept_co_partner_invitation(p_invitation_id UUID)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_email TEXT;
+BEGIN
+  SELECT email INTO v_email FROM public.users WHERE id = auth.uid();
+  UPDATE public.co_partner_invitations SET status='accepted', invitee_id=auth.uid(), updated_at=NOW()
+  WHERE id=p_invitation_id AND invitee_email=v_email AND status='pending';
+END; $$;
+
+-- Decline invitation:
+CREATE OR REPLACE FUNCTION public.decline_co_partner_invitation(p_invitation_id UUID)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_email TEXT;
+BEGIN
+  SELECT email INTO v_email FROM public.users WHERE id = auth.uid();
+  UPDATE public.co_partner_invitations SET status='declined', updated_at=NOW()
+  WHERE id=p_invitation_id AND invitee_email=v_email AND status='pending';
+END; $$;
+
+Also add a trigger on auth.users INSERT to auto-create the public.users row if not done by the client.
+
+IMPORTANT Supabase settings:
+- Disable "Confirm email" in Authentication → Providers → Email (allows instant account creation)
+
+═══════════════════════════════════════════════════════════
+APP NAVIGATION STRUCTURE (Expo Router)
+═══════════════════════════════════════════════════════════
+
+app/
+  _layout.tsx          — Root layout: AuthProvider + QueryClientProvider + theme
+  (auth)/
+    login.tsx          — Login + Register screen
+  (app)/               — Protected group (redirect to login if not authenticated)
+    _layout.tsx        — Bottom tab navigator
+    dashboard.tsx      — Dashboard screen
+    clients/
+      index.tsx        — Clients list screen
+      [id].tsx         — Client profile screen (tabs)
+    reminders.tsx      — Reminders screen
+    co-partners.tsx    — Co-Partners screen
+    profile.tsx        — User profile screen
+
+Bottom tab bar items: Dashboard, Clients, Reminders, Co-Partners, Profile
+Use a custom tab bar styled dark with emerald active state.
+
+═══════════════════════════════════════════════════════════
+AUTHENTICATION FLOW
+═══════════════════════════════════════════════════════════
+
+Screen: Login / Register (tabbed interface on one screen)
+
+Login tab:
+- Email input
+- Password input (with show/hide toggle)
+- Sign In button
+- Calls supabase.auth.signInWithPassword()
+- On success, navigate to dashboard
+
+Register tab:
+- Full Name input
+- Email input
+- Password input (show/hide toggle)
+- Confirm Password input
+- Create Account button
+- Calls supabase.auth.signUp() then upserts into public.users with role='staff'
+- On success, show success message, switch to login tab
+
+AuthProvider (context):
+- Wraps entire app
+- Listens to supabase.auth.onAuthStateChange
+- Fetches user profile from public.users on session load
+- Provides: session, user, profile, loading, signOut()
+
+AuthGuard:
+- Checks loading state → show splash/loader
+- Checks session → redirect to /login if no session
+- Renders children if authenticated
+
+═══════════════════════════════════════════════════════════
+SCREEN 1: DASHBOARD
+═══════════════════════════════════════════════════════════
+
+KPI Cards row (2-column grid, scrollable):
+- Active Clients (emerald icon)
+- Calls This Week (sky icon)
+- Follow-ups Today (amber icon)
+- Reports This Month (blue icon)
+- Co-Partners count (violet icon) — shows count of accepted co-partners and total clients under them
+
+Weekly Call Volume Chart:
+- Bar chart showing calls per day for current week (Sun–Sat)
+- Emerald-to-sky gradient bars
+- Use react-native-gifted-charts BarChart
+
+Due Today section:
+- List of reminders due today
+- Each item shows title, client name, "Done" button
+- Tapping Done calls completeReminder mutation
+
+Recent Activity section:
+- Paginated list (5 per page) of audit log entries
+- Shows actor name, action, table name, relative time
+- Pagination controls at bottom
+
+Data hooks:
+- useDashboardKPIs() — queries total active clients, calls this week, follow-ups today, reports this month
+- useWeeklyCallData() — aggregates call_logs by day for current week
+- useDueTodayReminders() — reminders where due_at is today and status=pending
+- useRecentActivity() — audit_logs with actor join, ordered by created_at DESC
+- useCoPartnersSummary() — counts accepted co-partner invitations + their clients
+
+═══════════════════════════════════════════════════════════
+SCREEN 2: CLIENTS LIST
+═══════════════════════════════════════════════════════════
+
+Header: "Clients" title + client count + "Add Client" button
+
+Search bar: debounced text search on full_name (ilike)
+
+Filter panel (collapsible):
+- Gender dropdown: All / Male / Female / Other
+- Program dropdown: All + list from wellness_programs table
+- Status dropdown: All / Active / Inactive
+- Clear filters button
+
+Client cards grid (2 columns on phones, 3 on tablets):
+Each card shows:
+- Avatar circle with initials (brand gradient background)
+- Full name
+- Status badge (green=active, grey=inactive)
+- Assigned program name (emerald text)
+- Mobile number
+- Gender · Age
+- Tap to navigate to Client Profile screen
+
+Add Client Modal/Bottom Sheet:
+Fields: Full Name, Mobile, Age, Gender (picker), Height cm, Weight kg, Wellness Program (optional picker)
+On submit: inserts into clients table with created_by = current user id
+
+Data: useClients(search, filters) — fetches with joins on wellness_programs
+
+═══════════════════════════════════════════════════════════
+SCREEN 3: CLIENT PROFILE (tabs)
+═══════════════════════════════════════════════════════════
+
+Header card:
+- Large avatar with initials
+- Full name, status badge, program badge, gender badge
+- Phone, Age, Height, Weight in a 2x2 grid
+
+Tab navigation (horizontal scrollable tabs or bottom sheet selector on mobile):
+4 tabs: Latest Report | Health History | Call Logs | Staff Notes
+
+TAB A — Latest Report:
+- Shows most recent health_report entry
+- Metrics displayed in cards: Body Fat %, Visceral Fat, BMI, Resting BMR, Body Age, Skeletal Muscle Mass
+- BMI status badge (underweight/normal/overweight/obese)
+- Visceral flag badge (normal/high/very_high)
+- "Log New Report" button → modal with all metric fields + date picker
+
+TAB B — Health History:
+- Line/bar charts showing trends over time for BMI, Body Fat %, Weight
+- Scrollable list of past reports (date, key metrics)
+- Pagination (10 per page)
+
+TAB C — Call Logs:
+- List of calls with: date, outcome badge (connected=green/missed=red/voicemail=amber), duration, notes
+- "Log Call" button → modal with: outcome picker, duration, discussion notes, follow-up toggle
+- If follow-up required: shows fields for follow-up title, due date, notes (creates a reminder automatically)
+- Pagination (10 per page)
+
+TAB D — Staff Notes:
+- List of notes, pinned notes appear first (with pin icon)
+- Each note: author avatar + name, date, content, pin/unpin button, delete button
+- "Add Note" text input with submit button
+- Notes can be pinned/unpinned by author or admin
+
+Call Button (floating or in header):
+- Phone icon button that initiates a native phone call (Linking.openURL tel:)
+- After call, prompts to log call outcome
+
+═══════════════════════════════════════════════════════════
+SCREEN 4: REMINDERS
+═══════════════════════════════════════════════════════════
+
+Header: "Reminders" title + "Schedule Task" button
+
+Filter tabs: Pending | Completed | All
+
+Reminders list (paginated, 10 per page):
+Each item shows:
+- Status dot (red=overdue, amber=pending, green=completed)
+- Title
+- Client name (tappable → navigate to client profile)
+- Due date/time with color coding (red if overdue)
+- Notes (if any) in a subtle box
+- "Mark Complete" button for pending reminders
+
+Overdue reminders have a red left border accent.
+
+Realtime sync: subscribe to reminders table changes via Supabase realtime and invalidate query on change.
+
+Add Reminder Modal/Bottom Sheet:
+Fields: Title, Client (searchable picker from clients list), Due Date+Time (date picker), Notes (optional)
+
+Data: useReminders(statusFilter) — fetches with client join
+
+═══════════════════════════════════════════════════════════
+SCREEN 5: CO-PARTNERS
+═══════════════════════════════════════════════════════════
+
+This screen is visible to ALL logged-in users (no role restriction).
+
+Purpose: Any user can add co-partners (people they supervise). Co-partners they add can log in and manage their own clients. The supervisor can view co-partners' clients but co-partners cannot see each other's data.
+
+Header: "Co-Partners" title (with Shield icon in violet) + "Add Co-Partner" button
+
+Received Partner Requests banner (if current user has pending invitations):
+- Card per invitation showing who invited them
+- Accept / Decline buttons
+- Calls accept_co_partner_invitation / decline_co_partner_invitation RPCs
+
+KPI summary row:
+- Active Partners count (violet)
+- Total Clients Under Partners count (emerald)
+- Pending Requests count (amber)
+
+Pending Sent Requests section (if any):
+- List of invitations you sent that haven't been accepted
+- Shows invitee email, sent time, Cancel button
+
+Active Co-Partners list:
+- Card per partner: avatar initial, name, email, joined date, client count
+- "View" button → navigate to partner detail screen
+- Remove button → confirm dialog → deletes the invitation record
+
+ADD CO-PARTNER — 2-Step Modal:
+
+Step 1 — Enter Email:
+- Email input
+- "Check Email" button
+- Queries public.users for that email
+- If found: shows "User exists: [Name] — Send them a partner request?" + Send button
+- If not found: shows "Not registered — Create account for them?" + Proceed button
+
+Step 2a — Send Invitation (existing user):
+- Confirm screen showing user name + email
+- "Send Request" button → inserts into co_partner_invitations with status='pending'
+- Partner sees the request banner next time they open the app
+
+Step 2b — Create New Account (new user):
+- Full Name input
+- Email (pre-filled)
+- Password input (show/hide toggle)
+- "Create & Link" button
+- Uses a SEPARATE temporary Supabase client (persistSession: false, autoRefreshToken: false)
+  to call signUp — this is CRITICAL to prevent session hijacking
+- After signUp, calls register_new_co_partner RPC on the MAIN client
+- Partner is immediately linked as accepted
+
+CO-PARTNER DETAIL SCREEN:
+- Partner info card: avatar, name, email, join date, client count
+- Searchable list of all clients created by that partner
+- Each client: name, gender, age, mobile, status badge
+
+Data hooks:
+- useCoPartners() — queries co_partner_invitations (accepted) + joins users + counts clients
+- useSentPendingInvitations() — pending invitations sent by current user
+- useReceivedInvitations() — pending invitations received by current user (polls every 30s)
+- useCoPartnerClients(partnerId) — clients where created_by = partnerId
+- useCheckEmail(email) — checks if email exists in public.users
+- useSendInvitation() — inserts pending invitation for existing user
+- useCreateCoPartner() — signUp via temp client + RPC
+- useAcceptInvitation() — calls accept_co_partner_invitation RPC
+- useDeclineInvitation() — calls decline_co_partner_invitation RPC
+- useRemoveCoPartner() — deletes the co_partner_invitations row
+
+═══════════════════════════════════════════════════════════
+SCREEN 6: USER PROFILE
+═══════════════════════════════════════════════════════════
+
+Sections:
+- Profile avatar (large initials circle) + display name + email + role badge
+- Editable fields: Full Name, Position/Title, Degree, Years of Experience, Personal Contact Number
+- Save Changes button → updates public.users row
+- Account stats: Total clients managed, calls made, notes written
+- Dark mode toggle
+- Sign Out button (red, at bottom)
+
+═══════════════════════════════════════════════════════════
+DATA ISOLATION RULES (CRITICAL)
+═══════════════════════════════════════════════════════════
+
+Co-partners can ONLY see:
+- Clients they personally created (created_by = their user id)
+- Their own call logs, health reports, reminders, staff notes
+
+Supervisors (users who invited co-partners) can see:
+- Their own clients
+- Clients of their accepted co-partners
+
+Nobody can see another user's data unless there is an accepted co_partner_invitation relationship.
+
+These rules are enforced at the database level via RLS policies (not just in the UI).
+
+═══════════════════════════════════════════════════════════
+SHARED COMPONENTS TO BUILD
+═══════════════════════════════════════════════════════════
+
+- GlassCard — dark semi-transparent card with border
+- KPICard — metric card with icon, value, label, optional subtitle
+- Badge — colored status pill (success/warning/danger/info/default/gold/silver variants)
+- Button — primary/secondary/outline/ghost/danger variants with loading spinner and left/right icons
+- Input — text input with label, left icon, right icon, error message
+- LoadingOverlay — full-screen semi-transparent overlay with spinner
+- Skeleton — animated pulse placeholder
+- Pagination — prev/next with page numbers
+- BottomSheet — slide-up modal sheet for forms on mobile
+- AvatarInitials — circle with first letter of name, gradient background
+- SearchBar — text input with search icon and clear button
+- EmptyState — centered icon + heading + subtext + optional CTA button
+- ConfirmDialog — alert dialog for destructive actions (e.g., remove partner)
+- Toast/Snackbar — brief success/error messages
+
+═══════════════════════════════════════════════════════════
+STATE MANAGEMENT & DATA PATTERNS
+═══════════════════════════════════════════════════════════
+
+Use React Query for ALL server state:
+- queryKey conventions: ['clients'], ['client', id], ['reminders', filter], ['co-partners', userId], etc.
+- Mutations call qc.invalidateQueries() on success to refresh related lists
+- Loading states: show skeleton/pulse placeholders
+- Error states: show inline error messages
+
+Supabase client setup:
+- Single supabase client exported from lib/supabase.ts
+- Use environment variables: EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY
+- For co-partner account creation ONLY: create a second isolated client with persistSession: false
+
+Realtime:
+- Reminders screen subscribes to reminders table changes
+- useReceivedInvitations() polls every 30 seconds for new partner requests
+
+═══════════════════════════════════════════════════════════
+FOLDER STRUCTURE
+═══════════════════════════════════════════════════════════
+
+src/
+  app/                        Expo Router screens
+  components/
+    ui/                       Shared UI primitives (Button, Card, Badge, Input, etc.)
+    layout/                   Tab bar, Header, etc.
+  features/
+    auth/                     AuthProvider, AuthGuard
+    dashboard/                DashboardScreen + components
+    clients/                  ClientsScreen, ClientProfileScreen, AddClientModal
+    health/                   LatestReportTab, HealthHistoryTab, AddReportModal
+    calls/                    CallLogsTab, LogCallModal, CallButton
+    notes/                    StaffNotesTab, AddNoteInput
+    reminders/                RemindersScreen, AddReminderModal
+    copartners/               CoPartnersScreen, InviteModal, CoPartnerDetail
+    profile/                  UserProfileScreen
+    notifications/            NotificationBell, notification list
+  hooks/
+    useClients.ts
+    useDashboard.ts
+    useReminders.ts
+    useHealthReports.ts
+    useCalls.ts
+    useStaffNotes.ts
+    useCoPartners.ts
+    useDarkMode.ts
+  lib/
+    supabase.ts               Supabase client
+    queryClient.ts            React Query client config
+    utils.ts                  formatRelative, getInitials, dueDateLabel, etc.
+  types/
+    index.ts                  All TypeScript interfaces and types
+
+═══════════════════════════════════════════════════════════
+KEY UTILITY FUNCTIONS
+═══════════════════════════════════════════════════════════
+
+getInitials(name): returns first letter(s) of name for avatars
+formatRelative(dateString): returns "2 hours ago", "yesterday", etc.
+dueDateLabel(dateString): returns "Today", "Tomorrow", "3 days ago (overdue)", etc.
+getEngagementColor(score): returns color class based on 0-100 score
+getReminderStatusColor(status): returns color for pending/completed/snoozed
+
+═══════════════════════════════════════════════════════════
+TYPES (TypeScript interfaces)
+═══════════════════════════════════════════════════════════
+
+UserRole = 'admin' | 'staff' | 'co_partner'
+ClientStatus = 'active' | 'inactive'
+CallOutcome = 'connected' | 'missed' | 'voicemail'
+ReminderStatus = 'pending' | 'completed' | 'snoozed'
+BMIStatus = 'underweight' | 'normal' | 'overweight' | 'obese'
+VisceralFlag = 'normal' | 'high' | 'very_high'
+Gender = 'male' | 'female' | 'other'
+
+Interfaces: UserProfile, Client, HealthReport, CallLog, Reminder, StaffNote,
+Notification, AuditLog, WellnessProgram, DashboardKPIs, CoPartner, CoPartnerInvitation
+
+═══════════════════════════════════════════════════════════
+ADDITIONAL NOTES
+═══════════════════════════════════════════════════════════
+
+1. The app name is "LifeCare Wellness" — use this in the header/splash screen
+2. All forms use Zod schemas for validation with react-hook-form
+3. Use date-fns for all date formatting and comparison
+4. The dashboard bar chart uses actual data from call_logs grouped by day of the current week
+5. Client profile has 4 tabs — health report is the default tab
+6. Logging a call with "follow_up_required = true" automatically creates a reminder
+7. Staff notes support pinning — pinned notes always appear at the top of the list
+8. Notifications table stores in-app alerts; show unread count badge on a bell icon in the header
+9. Audit logs track all major actions (creates, updates) for activity feed
+10. Dark mode toggle is stored in AsyncStorage and applied via NativeWind dark: classes
+11. All list screens have empty states with icon + message + optional CTA
+12. All modals/bottom sheets have loading states on submit buttons
+13. The co-partner feature is fully symmetric: any user can invite others, and invited users
+    can invite their own partners independently
+14. NEVER use supabase.auth.signUp() on the main client for co-partner creation —
+    always use a temporary isolated client (persistSession: false) to avoid session hijacking

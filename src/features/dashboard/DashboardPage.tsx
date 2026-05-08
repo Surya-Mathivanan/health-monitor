@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Users, Phone, Clock, FileText, TrendingUp, Activity, CheckCircle2 } from 'lucide-react';
+import { Users, Phone, Clock, FileText, TrendingUp, Activity, CheckCircle2, Users2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useDashboardKPIs, useWeeklyCallData, useDueTodayReminders, useRecentActivity } from '@/hooks/useDashboard';
 import { useCompleteReminder } from '@/hooks/useReminders';
+import { useCoPartnersSummary } from '@/hooks/useCoPartners';
+import { useAuth } from '@/features/auth/AuthProvider';
 import { Card, CardContent, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -48,6 +50,10 @@ export function DashboardPage() {
   const { data: dueToday = [] } = useDueTodayReminders();
   const { data: activity = [] } = useRecentActivity();
   const completeReminder = useCompleteReminder();
+  const { profile } = useAuth();
+  const { data: cpSummary } = useCoPartnersSummary();
+
+  const isAdmin = profile?.role === 'admin';
 
   const [activityPage, setActivityPage] = useState(1);
   const itemsPerPage = 5;
@@ -86,6 +92,13 @@ export function DashboardPage() {
               color="bg-amber-500/15 text-amber-400" />
             <KPICard icon={FileText} label="Reports This Month" value={kpis?.reports_this_month ?? 0}
               color="bg-blue-500/15 text-blue-400" />
+            <KPICard
+              icon={Users2}
+              label="Co-Partners"
+              value={cpSummary?.total_partners ?? 0}
+              color="bg-violet-500/15 text-violet-400"
+              subtitle={`${cpSummary?.total_partner_clients ?? 0} clients under them`}
+            />
           </>
         )}
       </div>
